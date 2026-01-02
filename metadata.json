@@ -1,0 +1,7 @@
+{
+  "name": "ReadMind AI - 语文精读阅读平台",
+  "description": "基于 PISA 阅读框架，融合 AI 教学智能体的精读与思维训练平台，助力学生提升核心素养。",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
