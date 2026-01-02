@@ -2,7 +2,16 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { CapabilityType } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+// 安全获取 API KEY，防止 process 未定义导致的崩溃
+const getApiKey = () => {
+  try {
+    return (typeof process !== 'undefined' && process.env?.API_KEY) ? process.env.API_KEY : '';
+  } catch (e) {
+    return '';
+  }
+};
+
+const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
 export const geminiService = {
   /**
@@ -41,7 +50,6 @@ export const geminiService = {
 
   /**
    * Generates a set of PISA questions personalized for the student.
-   * Refined to handle specific text types and difficulty standards.
    */
   async generatePISAQuestions(text: string, title: string, type: string, difficulty: string, targetCapability?: CapabilityType) {
     const prompt = `
@@ -95,34 +103,39 @@ export const geminiService = {
    * Evaluates student's answer based on PISA framework.
    */
   async evaluateAnswer(capability: CapabilityType, question: string, answer: string, textContext: string) {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `
-        Analyze the following student answer based on PISA ${capability} framework.
-        If the text is Scientific, evaluate based on logical rigor and evidence-based reasoning.
-        Text Context: ${textContext}
-        Question: ${question}
-        Student Answer: ${answer}
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `
+          Analyze the following student answer based on PISA ${capability} framework.
+          If the text is Scientific, evaluate based on logical rigor and evidence-based reasoning.
+          Text Context: ${textContext}
+          Question: ${question}
+          Student Answer: ${answer}
 
-        Provide feedback in JSON format:
-        - score: 0-100
-        - feedback: Constructive feedback in Chinese.
-        - suggestions: How to improve (e.g., "Cite more evidence", "Refine causal logic").
-      `,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            score: { type: Type.NUMBER },
-            feedback: { type: Type.STRING },
-            suggestions: { type: Type.STRING }
-          },
-          required: ["score", "feedback", "suggestions"]
+          Provide feedback in JSON format:
+          - score: 0-100
+          - feedback: Constructive feedback in Chinese.
+          - suggestions: How to improve (e.g., "Cite more evidence", "Refine causal logic").
+        `,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              score: { type: Type.NUMBER },
+              feedback: { type: Type.STRING },
+              suggestions: { type: Type.STRING }
+            },
+            required: ["score", "feedback", "suggestions"]
+          }
         }
-      }
-    });
+      });
 
-    return JSON.parse(response.text || '{}');
+      return JSON.parse(response.text || '{}');
+    } catch (e) {
+      console.error("Evaluation Error:", e);
+      return { score: 0, feedback: "无法连接到分析引擎", suggestions: "请检查网络连接" };
+    }
   }
 };
